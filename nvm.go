@@ -18,7 +18,7 @@ func (s *JsonSerializer[T]) Unmarshal(raw []byte, v *T) error {
 
 type NvmBuilder[K comparable, V any] struct {
 	file            string
-	cacheSize       int
+	cacheSize       uint64
 	blockSize       int
 	bucketSize      int
 	regionSize      int
@@ -31,7 +31,7 @@ type NvmBuilder[K comparable, V any] struct {
 	valueSerializer Serializer[V]
 }
 
-func NewNvmBuilder[K comparable, V any](file string, cacheSize int) *NvmBuilder[K, V] {
+func NewNvmBuilder[K comparable, V any](file string, cacheSize uint64) *NvmBuilder[K, V] {
 	return &NvmBuilder[K, V]{
 		file:            file,
 		cacheSize:       cacheSize,

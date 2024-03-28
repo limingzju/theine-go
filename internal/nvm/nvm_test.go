@@ -73,7 +73,7 @@ func TestNvmResize(t *testing.T) {
 	defer os.Remove("bfoo")
 	for _, size := range []int{30 << 20, 100 << 20, 50 << 20} {
 		store, err := NewNvmStore[int, []byte](
-			"bfoo", 512, size, 4<<10, 100<<10, 3, 20, 0, 8, func(err error) {
+			"bfoo", 512, uint64(size), 4<<10, 100<<10, 3, 20, 0, 8, func(err error) {
 				require.Nil(t, err)
 			},
 			&IntSerializer{}, &ByteSerializer{},

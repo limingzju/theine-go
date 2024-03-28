@@ -31,16 +31,16 @@ const (
 	DataBlock
 )
 
-func alignDown(num int, alignment int) int {
+func alignDown(num uint64, alignment uint64) uint64 {
 	return num - num%alignment
 }
 
-func alignUp(num int, alignment int) int {
+func alignUp(num uint64, alignment uint64) uint64 {
 	return alignDown(num+alignment-1, alignment)
 }
 
 func NewNvmStore[K comparable, V any](
-	file string, blockSize int, cacheSize int, bucketSize int, regionSize int,
+	file string, blockSize int, cacheSize uint64, bucketSize int, regionSize int,
 	cleanRegionSize int, sizePct uint8, bigHashMaxEntrySize int, bfSize int, errorHandler func(err error),
 	keySerializer internal.Serializer[K],
 	valueSerializer internal.Serializer[V],
@@ -89,19 +89,19 @@ func NewNvmStore[K comparable, V any](
 	if store.errorHandler == nil {
 		store.errorHandler = func(err error) {}
 	}
-	bhSize := cacheSize * int(sizePct) / 100
+	bhSize := cacheSize * uint64(sizePct) / 100
 	bcSize := cacheSize - bhSize
-	bucketSize = alignUp(bucketSize, blockSize)
-	regionSize = alignUp(regionSize, blockSize)
+	bucketSize = int(alignUp(uint64(bucketSize), uint64(blockSize)))
+	regionSize = int(alignUp(uint64(regionSize), uint64(blockSize)))
 	allocator := alloc.NewAllocator(bucketSize, regionSize, blockSize)
 	if bhSize > 0 {
-		bhSize = alignDown(bhSize, blockSize)
+		bhSize = alignDown(bhSize, uint64(blockSize))
 		bh := NewBigHash(uint64(bhSize), uint64(bucketSize), uint32(bfSize), allocator)
 		bh.file = f
 		store.bighash = bh
 	}
 	if bcSize > 0 {
-		bcSize = alignDown(bcSize, blockSize)
+		bcSize = alignDown(bcSize, uint64(blockSize))
 		bc := NewBlockCache(
 			bcSize, regionSize, uint32(cleanRegionSize), uint64(bhSize), allocator, errorHandler,
 		)

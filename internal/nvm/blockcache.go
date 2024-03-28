@@ -67,9 +67,9 @@ type BlockCache struct {
 	regionManager   *RegionManager
 }
 
-func NewBlockCache(cacheSize int, regionSize int, cleanRegionSize uint32, offset uint64, allocator *alloc.Allocator, errHandler func(err error)) *BlockCache {
+func NewBlockCache(cacheSize uint64, regionSize int, cleanRegionSize uint32, offset uint64, allocator *alloc.Allocator, errHandler func(err error)) *BlockCache {
 	regionSize = align(regionSize)
-	regionCount := cacheSize / regionSize
+	regionCount := cacheSize / uint64(regionSize)
 	b := &BlockCache{
 		Offset:          offset,
 		mu:              &sync.RWMutex{},
@@ -77,7 +77,7 @@ func NewBlockCache(cacheSize int, regionSize int, cleanRegionSize uint32, offset
 		CacheSize:       uint64(cacheSize),
 		RegionSize:      uint32(regionSize),
 		entrySize:       uint64(unsafe.Sizeof(BlockEntry{})),
-		index:           make(map[uint64]*BlockInfo, cacheSize/regionSize),
+		index:           make(map[uint64]*BlockInfo, cacheSize/uint64(regionSize)),
 		Clock:           &clock.Clock{Start: time.Now().UTC()},
 	}
 	if errHandler == nil {
