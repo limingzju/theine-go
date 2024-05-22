@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"io"
+	"log"
 	"math/rand"
 	"runtime"
 	"sync"
@@ -21,7 +22,8 @@ import (
 const (
 	MAX_READ_BUFF_SIZE  = 64
 	MIN_WRITE_BUFF_SIZE = 4
-	MAX_WRITE_BUFF_SIZE = 1024
+	//MAX_WRITE_BUFF_SIZE = 1024
+	MAX_WRITE_BUFF_SIZE = 16384
 )
 
 type RemoveReason uint8
@@ -134,6 +136,7 @@ func NewStore[K comparable, V any](
 	if writeBufSize > MAX_WRITE_BUFF_SIZE {
 		writeBufSize = MAX_WRITE_BUFF_SIZE
 	}
+	log.Printf("NewStore writeBufSize=%d", writeBufSize)
 	shardCount := 1
 	for shardCount < runtime.GOMAXPROCS(0)*2 {
 		shardCount *= 2
@@ -897,12 +900,15 @@ func (s *LoadingStore[K, V]) Get(ctx context.Context, key K) (V, error) {
 			// first try get from secondary cache
 			if s.secondaryCache != nil {
 				vs, cost, expire, ok, err := s.secondaryCache.Get(key)
+				_ = cost
+				_ = expire
 				var notFound *NotFound
 				if err != nil && !errors.As(err, &notFound) {
 					return Loaded[V]{}, err
 				}
 				if ok {
-					_, _, _ = s.setInternal(key, vs, cost, expire, true)
+					// 影响性能
+					// _, _, _ = s.setInternal(key, vs, cost, expire, true)
 					return Loaded[V]{Value: vs}, nil
 				}
 			}

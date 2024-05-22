@@ -2,6 +2,7 @@ package nvm
 
 import (
 	"bytes"
+	"log"
 	"math/rand"
 	"os"
 	"sync"
@@ -11,6 +12,17 @@ import (
 	"github.com/Yiling-J/theine-go/internal/alloc"
 	"github.com/Yiling-J/theine-go/internal/nvm/directio"
 )
+
+type Ordered interface {
+	int | int8 | int16 | int32 | int64 | float32 | float64 | uint | uint8 | uint16 | uint32 | uint64
+}
+
+func Max[T Ordered](a, b T) T {
+	if a > b {
+		return a
+	}
+	return b
+}
 
 type Region struct {
 	EndOffset uint64
@@ -55,8 +67,8 @@ func NewRegionManager(offset uint64, regionSize, regionCount, cleanRegionSize ui
 		regions:      make(map[uint32]*Region, regionCount),
 		sketch:       internal.NewCountMinSketch(),
 		allocator:    allocator,
-		flushChan:    make(chan uint32, 3),
-		cleanChan:    make(chan uint32, 3),
+		flushChan:    make(chan uint32, Max(uint32(3), cleanRegionSize)),
+		cleanChan:    make(chan uint32, Max(uint32(3), cleanRegionSize)),
 		errorHandler: errHandler,
 	}
 	for i := 0; i < int(regionCount); i++ {
@@ -68,7 +80,7 @@ func NewRegionManager(offset uint64, regionSize, regionCount, cleanRegionSize ui
 	rm.sketch.EnsureCapacity(uint(regionSize))
 	go rm.readQ()
 	for i := 0; i < int(cleanRegionSize); i++ {
-		go rm.flushAndClean()
+		go rm.flushAndClean(i)
 	}
 	return rm
 }
@@ -125,29 +137,34 @@ func (m *RegionManager) Allocate(size int) (uint32, uint64, *bytes.Buffer, func(
 }
 
 // reclaim should have rlock from caller
-func (m *RegionManager) reclaim() (uint32, error) {
-	victim := m.victim()
-	buffer := m.bufferPool.Get().(*bytes.Buffer)
-	buffer.Reset()
-	data := buffer.Bytes()[:m.regionSize]
-	_, err := m.file.ReadAt(data, int64(m.offset+uint64(victim)*uint64(m.regionSize)))
-	if err != nil {
+func (m *RegionManager) reclaim(threadId int) (uint32, error) {
+	victim, clean := m.victim(threadId)
+	if clean {
+		return victim, nil
+	} else {
+		buffer := m.bufferPool.Get().(*bytes.Buffer)
+		buffer.Reset()
+		data := buffer.Bytes()[:m.regionSize]
+		_, err := m.file.ReadAt(data, int64(m.offset+uint64(victim)*uint64(m.regionSize)))
+		if err != nil {
+			return victim, err
+		}
+		region := m.regions[victim]
+		region.lock.Lock()
+		err = m.removeRegion(data, region.EndOffset)
+		m.bufferPool.Put(buffer)
+		region.clean = true
+		region.lock.Unlock()
 		return victim, err
 	}
-	region := m.regions[victim]
-	region.lock.Lock()
-	err = m.removeRegion(data, region.EndOffset)
-	m.bufferPool.Put(buffer)
-	region.clean = true
-	region.lock.Unlock()
-	return victim, err
 }
 
-func (m *RegionManager) flushSync(rid uint32) error {
+func (m *RegionManager) flushSync(threadId int, rid uint32) error {
 	region := m.regions[rid]
 	region.lock.Lock()
 	defer region.lock.Unlock()
 	b := region.buffer.Bytes()[:m.regionSize]
+	log.Printf("flushAndSync threadId=%d rid=%d size=%d", threadId, rid, m.regionSize)
 	_, err := m.file.WriteAt(b, int64(m.offset+uint64(rid)*uint64(m.regionSize)))
 	if err != nil {
 		return err
@@ -158,9 +175,9 @@ func (m *RegionManager) flushSync(rid uint32) error {
 
 // flush and clean always come together
 // because flush means current buffer is full and need a new clean buffer
-func (m *RegionManager) flushAndClean() {
+func (m *RegionManager) flushAndClean(threadId int) {
 	for rid := range m.flushChan {
-		err := m.flushSync(rid)
+		err := m.flushSync(threadId, rid)
 		if err != nil {
 			m.errorHandler(err)
 			continue
@@ -170,17 +187,19 @@ func (m *RegionManager) flushAndClean() {
 			new := m.cleanRegionCount.Add(-1)
 			if new >= int32(m.cleanRegionSize) {
 				clean = uint32(new)
+				log.Printf("!cleanRegionDone threadId %d cleanChan %d", threadId, clean)
 				m.cleanChan <- clean
 				continue
 			} else {
 				m.cleanRegionDone.Store(true)
 			}
 		}
-		clean, err = m.reclaim()
+		clean, err = m.reclaim(threadId)
 		if err != nil {
 			m.errorHandler(err)
 			continue
 		}
+		log.Printf("threadId %d cleanChan %d", threadId, clean)
 		m.cleanChan <- clean
 	}
 }
@@ -195,7 +214,9 @@ func (m *RegionManager) detachBuffer(region *Region) {
 	m.bufferPool.Put(buffer)
 }
 
-func (m *RegionManager) victim() uint32 {
+func (m *RegionManager) victim(threadId int) (uint32, bool) {
+	clean := false
+	log.Printf("victim %d start", threadId)
 	counter := 0
 	var new uint32
 	var fq uint
@@ -205,6 +226,11 @@ func (m *RegionManager) victim() uint32 {
 		// skip if already clean or buffer not nil
 		rg := m.regions[rid]
 		rg.lock.RLock()
+		log.Printf("victim %d regionCount=%d rid=%d clean=%v buffer_is_nil=%v", threadId, m.regionCount, rid, rg.clean, rg.buffer == nil)
+		if rg.clean && rg.buffer == nil {
+			rg.lock.RUnlock()
+			return rid, true
+		}
 		if rg.clean || rg.buffer != nil {
 			rg.lock.RUnlock()
 			continue
@@ -221,7 +247,8 @@ func (m *RegionManager) victim() uint32 {
 		}
 	}
 	m.sketchMu.RUnlock()
-	return new
+	log.Printf("victim %d return rid=%d", threadId, new)
+	return new, clean
 }
 
 func (m *RegionManager) readQ() {

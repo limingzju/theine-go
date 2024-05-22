@@ -1,8 +1,12 @@
 package theine
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"time"
 
+	"github.com/Yiling-J/theine-go/internal"
 	"github.com/Yiling-J/theine-go/internal/nvm"
 )
 
@@ -118,4 +122,69 @@ func (b *NvmBuilder[K, V]) Build() (*nvm.NvmStore[K, V], error) {
 		b.regionSize, b.cleanRegionSize, uint8(b.bhPct), b.maxItemSize, b.bfSize, b.errorHandler,
 		b.keySerializer, b.valueSerializer,
 	)
+}
+
+type LoadingNvmStore[K comparable, V any] struct {
+	loader func(ctx context.Context, key K) (Loaded[V], error)
+	*nvm.NvmStore[K, V]
+	groups []*internal.Group[K, Loaded[V]]
+	group  *internal.Group[K, Loaded[V]]
+	// hasher *internal.Hasher[K]
+}
+
+func NewLoadingNvmStore[K comparable, V any](nvmStore *nvm.NvmStore[K, V]) *LoadingNvmStore[K, V] {
+	s := &LoadingNvmStore[K, V]{
+		NvmStore: nvmStore,
+		groups:   make([]*internal.Group[K, Loaded[V]], 1024),
+		group:    internal.NewGroup[K, Loaded[V]](),
+		//		hasher:   internal.NewHasher(nil),
+	}
+
+	for i := 0; i < len(s.groups); i++ {
+		s.groups[i] = internal.NewGroup[K, Loaded[V]]()
+	}
+	return s
+}
+
+func (s *LoadingNvmStore[K, V]) Loader(loader func(ctx context.Context, key K) (Loaded[V], error)) {
+	s.loader = loader
+}
+
+//func (s *LoadingNvmStore[K, V]) index(key K) (uint64, int) {
+//	base := s.hasher.hash(key)
+//	h := ((base >> 16) ^ base) * 0x45d9f3b
+//	h = ((h >> 16) ^ h) * 0x45d9f3b
+//	h = (h >> 16) ^ h
+//	return base, int(h & uint64(len(s.groups)-1))
+//}
+
+func (s *LoadingNvmStore[K, V]) Get(ctx context.Context, key K) (V, error) {
+	vs, cost, expire, ok, err := s.NvmStore.Get(key)
+	_ = cost
+	_ = expire
+	var notFound *internal.NotFound
+	if err != nil && !errors.As(err, &notFound) {
+		//		log.Printf("LoadingNvmStore err %v", err)
+		return vs, err
+	}
+
+	if ok {
+		return vs, nil
+	}
+
+	loaded, err, _ := s.group.Do(key, func() (Loaded[V], error) {
+		loaded, err := s.loader(ctx, key)
+		if err == nil {
+			s.Set(key, loaded.Value, loaded.Cost, time.Now().Add(loaded.TTL).UnixNano())
+		}
+		//		log.Printf("LoadingNvmStore loaded err %v", err)
+		return loaded, err
+	})
+	return loaded.Value, err
+}
+
+type NotFound struct{}
+
+func (e *NotFound) Error() string {
+	return "i: not found"
 }
