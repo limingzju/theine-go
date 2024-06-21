@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/Yiling-J/theine-go/internal"
-	"github.com/Yiling-J/theine-go/internal/nvm"
+	"github.com/Yiling-J/theine-go/pkg"
+	"github.com/Yiling-J/theine-go/pkg/nvm"
 )
 
 type JsonSerializer[T any] struct{}
@@ -127,21 +127,21 @@ func (b *NvmBuilder[K, V]) Build() (*nvm.NvmStore[K, V], error) {
 type LoadingNvmStore[K comparable, V any] struct {
 	loader func(ctx context.Context, key K) (Loaded[V], error)
 	*nvm.NvmStore[K, V]
-	groups []*internal.Group[K, Loaded[V]]
-	group  *internal.Group[K, Loaded[V]]
+	groups []*pkg.Group[K, Loaded[V]]
+	group  *pkg.Group[K, Loaded[V]]
 	// hasher *internal.Hasher[K]
 }
 
 func NewLoadingNvmStore[K comparable, V any](nvmStore *nvm.NvmStore[K, V]) *LoadingNvmStore[K, V] {
 	s := &LoadingNvmStore[K, V]{
 		NvmStore: nvmStore,
-		groups:   make([]*internal.Group[K, Loaded[V]], 1024),
-		group:    internal.NewGroup[K, Loaded[V]](),
+		groups:   make([]*pkg.Group[K, Loaded[V]], 1024),
+		group:    pkg.NewGroup[K, Loaded[V]](),
 		//		hasher:   internal.NewHasher(nil),
 	}
 
 	for i := 0; i < len(s.groups); i++ {
-		s.groups[i] = internal.NewGroup[K, Loaded[V]]()
+		s.groups[i] = pkg.NewGroup[K, Loaded[V]]()
 	}
 	return s
 }
@@ -162,7 +162,7 @@ func (s *LoadingNvmStore[K, V]) Get(ctx context.Context, key K) (V, error) {
 	vs, cost, expire, ok, err := s.NvmStore.Get(key)
 	_ = cost
 	_ = expire
-	var notFound *internal.NotFound
+	var notFound *pkg.NotFound
 	if err != nil && !errors.As(err, &notFound) {
 		//		log.Printf("LoadingNvmStore err %v", err)
 		return vs, err

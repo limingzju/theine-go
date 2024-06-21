@@ -5,17 +5,17 @@ import (
 	"io"
 	"time"
 
-	"github.com/Yiling-J/theine-go/internal"
+	"github.com/Yiling-J/theine-go/pkg"
 )
 
 const (
 	ZERO_TTL = 0 * time.Second
 )
 
-var VersionMismatch = internal.VersionMismatch
+var VersionMismatch = pkg.VersionMismatch
 
-type RemoveReason = internal.RemoveReason
-type DataBlock = internal.DataBlock[any]
+type RemoveReason = pkg.RemoveReason
+type DataBlock = pkg.DataBlock[any]
 
 type Loaded[V any] struct {
 	Value V
@@ -23,8 +23,8 @@ type Loaded[V any] struct {
 	TTL   time.Duration
 }
 
-func (l *Loaded[V]) internal() internal.Loaded[V] {
-	return internal.Loaded[V]{
+func (l *Loaded[V]) internal() pkg.Loaded[V] {
+	return pkg.Loaded[V]{
 		Value: l.Value,
 		Cost:  l.Cost,
 		TTL:   l.TTL,
@@ -32,13 +32,13 @@ func (l *Loaded[V]) internal() internal.Loaded[V] {
 }
 
 const (
-	REMOVED = internal.REMOVED
-	EVICTED = internal.EVICTED
-	EXPIRED = internal.EXPIRED
+	REMOVED = pkg.REMOVED
+	EVICTED = pkg.EVICTED
+	EXPIRED = pkg.EXPIRED
 )
 
 type Cache[K comparable, V any] struct {
-	store *internal.Store[K, V]
+	store *pkg.Store[K, V]
 }
 
 // Get gets value by key.
@@ -90,7 +90,7 @@ func (c *Cache[K, V]) LoadCache(version uint64, reader io.Reader) error {
 }
 
 type LoadingCache[K comparable, V any] struct {
-	store *internal.LoadingStore[K, V]
+	store *pkg.LoadingStore[K, V]
 }
 
 // Get gets value by key.
@@ -142,11 +142,11 @@ func (c *LoadingCache[K, V]) Close() {
 }
 
 type Serializer[T any] interface {
-	internal.Serializer[T]
+	pkg.Serializer[T]
 }
 
 type HybridCache[K comparable, V any] struct {
-	store *internal.Store[K, V]
+	store *pkg.Store[K, V]
 }
 
 // Get gets value by key.
@@ -186,7 +186,7 @@ func (c *HybridCache[K, V]) Close() {
 }
 
 type HybridLoadingCache[K comparable, V any] struct {
-	store *internal.LoadingStore[K, V]
+	store *pkg.LoadingStore[K, V]
 }
 
 // Get gets value by key.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/Yiling-J/theine-go/internal"
+	"github.com/Yiling-J/theine-go/pkg"
 )
 
 type params interface {
@@ -47,7 +47,7 @@ func (p *loadingParams[K, V]) validate() error {
 }
 
 type hybridParams[K comparable, V any] struct {
-	secondaryCache internal.SecondaryCache[K, V]
+	secondaryCache pkg.SecondaryCache[K, V]
 	workers        int
 	admProbability float32
 }
@@ -104,7 +104,7 @@ func (b *Builder[K, V]) Build() (*Cache[K, V], error) {
 	if err := validateParams(&b.baseParams); err != nil {
 		return nil, err
 	}
-	store := internal.NewStore(b.maxsize, b.doorkeeper, b.removalListener, b.cost, nil, 0, 0, b.stringKeyFunc)
+	store := pkg.NewStore(b.maxsize, b.doorkeeper, b.removalListener, b.cost, nil, 0, 0, b.stringKeyFunc)
 	return &Cache[K, V]{store: store}, nil
 }
 
@@ -121,7 +121,7 @@ func (b *Builder[K, V]) Loading(
 }
 
 // Add secondary cache and switch to HybridBuilder.
-func (b *Builder[K, V]) Hybrid(cache internal.SecondaryCache[K, V]) *HybridBuilder[K, V] {
+func (b *Builder[K, V]) Hybrid(cache pkg.SecondaryCache[K, V]) *HybridBuilder[K, V] {
 	return &HybridBuilder[K, V]{
 		baseParams: b.baseParams,
 		hybridParams: hybridParams[K, V]{
@@ -140,9 +140,9 @@ func (b *Builder[K, V]) BuildWithLoader(loader func(ctx context.Context, key K) 
 	if loader == nil {
 		return nil, errors.New("loader function required")
 	}
-	store := internal.NewStore(b.maxsize, b.doorkeeper, b.removalListener, b.cost, nil, 0, 0, b.stringKeyFunc)
-	loadingStore := internal.NewLoadingStore(store)
-	loadingStore.Loader(func(ctx context.Context, key K) (internal.Loaded[V], error) {
+	store := pkg.NewStore(b.maxsize, b.doorkeeper, b.removalListener, b.cost, nil, 0, 0, b.stringKeyFunc)
+	loadingStore := pkg.NewLoadingStore(store)
+	loadingStore.Loader(func(ctx context.Context, key K) (pkg.Loaded[V], error) {
 		v, err := loader(ctx, key)
 		return v.internal(), err
 	})
@@ -155,7 +155,7 @@ type LoadingBuilder[K comparable, V any] struct {
 }
 
 // Add secondary cache and switch to HybridLoadingBuilder.
-func (b *LoadingBuilder[K, V]) Hybrid(cache internal.SecondaryCache[K, V]) *HybridLoadingBuilder[K, V] {
+func (b *LoadingBuilder[K, V]) Hybrid(cache pkg.SecondaryCache[K, V]) *HybridLoadingBuilder[K, V] {
 	return &HybridLoadingBuilder[K, V]{
 		baseParams:    b.baseParams,
 		loadingParams: b.loadingParams,
@@ -171,9 +171,9 @@ func (b *LoadingBuilder[K, V]) Build() (*LoadingCache[K, V], error) {
 	if err := validateParams(&b.baseParams, &b.loadingParams); err != nil {
 		return nil, err
 	}
-	store := internal.NewStore(b.maxsize, b.doorkeeper, b.removalListener, b.cost, nil, 0, 0, b.stringKeyFunc)
-	loadingStore := internal.NewLoadingStore(store)
-	loadingStore.Loader(func(ctx context.Context, key K) (internal.Loaded[V], error) {
+	store := pkg.NewStore(b.maxsize, b.doorkeeper, b.removalListener, b.cost, nil, 0, 0, b.stringKeyFunc)
+	loadingStore := pkg.NewLoadingStore(store)
+	loadingStore.Loader(func(ctx context.Context, key K) (pkg.Loaded[V], error) {
 		v, err := b.loader(ctx, key)
 		return v.internal(), err
 	})
@@ -216,7 +216,7 @@ func (b *HybridBuilder[K, V]) Build() (*HybridCache[K, V], error) {
 	if err := validateParams(&b.baseParams, &b.hybridParams); err != nil {
 		return nil, err
 	}
-	store := internal.NewStore(b.maxsize, b.doorkeeper, b.removalListener, b.cost,
+	store := pkg.NewStore(b.maxsize, b.doorkeeper, b.removalListener, b.cost,
 		b.secondaryCache, b.workers, b.admProbability, b.stringKeyFunc,
 	)
 	return &HybridCache[K, V]{store: store}, nil
@@ -233,12 +233,12 @@ func (b *HybridLoadingBuilder[K, V]) Build() (*HybridLoadingCache[K, V], error) 
 	if err := validateParams(&b.baseParams, &b.hybridParams, &b.loadingParams); err != nil {
 		return nil, err
 	}
-	store := internal.NewStore(
+	store := pkg.NewStore(
 		b.maxsize, b.doorkeeper, b.removalListener, b.cost, b.secondaryCache, b.workers,
 		b.admProbability, b.stringKeyFunc,
 	)
-	loadingStore := internal.NewLoadingStore(store)
-	loadingStore.Loader(func(ctx context.Context, key K) (internal.Loaded[V], error) {
+	loadingStore := pkg.NewLoadingStore(store)
+	loadingStore.Loader(func(ctx context.Context, key K) (pkg.Loaded[V], error) {
 		v, err := b.loader(ctx, key)
 		return v.internal(), err
 	})
