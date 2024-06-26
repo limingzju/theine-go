@@ -164,7 +164,7 @@ func (m *RegionManager) flushSync(threadId int, rid uint32) error {
 	region.lock.Lock()
 	defer region.lock.Unlock()
 	b := region.buffer.Bytes()[:m.regionSize]
-	log.Printf("flushAndSync threadId=%d rid=%d size=%d", threadId, rid, m.regionSize)
+	//log.Printf("flushAndSync threadId=%d rid=%d size=%d", threadId, rid, m.regionSize)
 	_, err := m.file.WriteAt(b, int64(m.offset+uint64(rid)*uint64(m.regionSize)))
 	if err != nil {
 		return err
@@ -187,7 +187,7 @@ func (m *RegionManager) flushAndClean(threadId int) {
 			new := m.cleanRegionCount.Add(-1)
 			if new >= int32(m.cleanRegionSize) {
 				clean = uint32(new)
-				log.Printf("!cleanRegionDone threadId %d cleanChan %d", threadId, clean)
+				//log.Printf("cleanRegionDone threadId %d cleanChan %d", threadId, clean)
 				m.cleanChan <- clean
 				continue
 			} else {
