@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/Yiling-J/theine-go"
-	"github.com/Yiling-J/theine-go/internal"
-	"github.com/Yiling-J/theine-go/internal/clock"
+	"github.com/Yiling-J/theine-go/pkg"
+	"github.com/Yiling-J/theine-go/pkg/clock"
 	"github.com/cockroachdb/pebble"
 )
 
@@ -114,7 +114,7 @@ func (n *PebbleCache[K, V]) Get(key K) (value V, cost int64, expire int64, ok bo
 		return value, cost, expire, false, err
 	}
 	if !ok {
-		return value, cost, expire, false, &internal.NotFound{}
+		return value, cost, expire, false, &pkg.NotFound{}
 	}
 	err = n.valueSerializer.Unmarshal(vb, &value)
 	if err != nil {
