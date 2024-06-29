@@ -114,6 +114,7 @@ func (c *BlockCache) Lookup(key []byte) (item *alloc.AllocItem, cost int64, expi
 	item, err = c.regionManager.GetData(
 		index, rid, offset, uint64(index.sizeHint)*alignSize,
 	)
+	log.Printf("block_cache lookup key=%s hash=%d rid=%d offset=%d sizeHint=%d err=%v", string(key), kh, rid, offset, index.sizeHint, err)
 	if err != nil {
 		log.Printf("block_cache lookup key=%s hash=%d err=%v", string(key), kh, err)
 		return item, cost, expire, false, err
@@ -128,6 +129,8 @@ func (c *BlockCache) Lookup(key []byte) (item *alloc.AllocItem, cost int64, expi
 		log.Printf("block_cache lookup key=%s hash=%d unmarshal err=%s", string(key), kh, err)
 		return item, cost, expire, false, err
 	}
+	log.Printf("block_cache lookup key=%s hash=%d entry=%+v", string(key), kh, entry)
+
 	checksum := xxh3.Hash(item.Data[c.entrySize : c.entrySize+entry.keySize+entry.valueSize])
 	if checksum != entry.checksum {
 		log.Printf("block_cache lookup key=%s hash=%d checksum not match %d %d", string(key), kh, checksum, entry.checksum)
@@ -163,7 +166,7 @@ func (c *BlockCache) Insert(key []byte, value []byte, cost int64, expire int64) 
 		size += (alignSize - res)
 	}
 	rid, offset, buffer, cb, err := c.regionManager.Allocate(size)
-	log.Printf("block_cache insert key=%s hash=%d rid=%d off=%d size=%d err=%v", string(key), kh, rid, offset, size, err)
+	log.Printf("theine block_cache insert key=%s hash=%d rid=%d off=%d size=%d err=%v", string(key), kh, rid, offset, size, err)
 	if err != nil {
 		return err
 	}
@@ -187,6 +190,7 @@ func (c *BlockCache) Insert(key []byte, value []byte, cost int64, expire int64) 
 	if err != nil {
 		return err
 	}
+	log.Printf("theine block_cache insert key=%s entrySize=%d checksum=%d", string(key), c.entrySize, header.checksum)
 	_ = copy(b[:], hb)
 	cb()
 	c.mu.Lock()
