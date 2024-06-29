@@ -100,9 +100,11 @@ func (c *BlockCache) realAddress(address uint32) (uint64, uint64) {
 
 func (c *BlockCache) Lookup(key []byte) (item *alloc.AllocItem, cost int64, expire int64, ok bool, err error) {
 	kh := xxh3.Hash(key)
+	log.Printf("block_cache lookup key=%s hash=%d", string(key), kh)
 	c.mu.RLock()
 	index, ok := c.index[kh]
 	if !ok {
+		log.Printf("block_cache lookup key=%s hash=%d index !ok", string(key), kh)
 		c.mu.RUnlock()
 		return nil, cost, expire, false, nil
 	}
@@ -113,26 +115,32 @@ func (c *BlockCache) Lookup(key []byte) (item *alloc.AllocItem, cost int64, expi
 		index, rid, offset, uint64(index.sizeHint)*alignSize,
 	)
 	if err != nil {
+		log.Printf("block_cache lookup key=%s hash=%d err=%v", string(key), kh, err)
 		return item, cost, expire, false, err
 	}
 	if item == nil {
+		log.Printf("block_cache lookup key=%s hash=%d item nil", string(key), kh)
 		return item, cost, expire, false, nil
 	}
 	var entry BlockEntry
 	err = c.entrySerializer.Unmarshal(item.Data[:c.entrySize], &entry)
 	if err != nil {
+		log.Printf("block_cache lookup key=%s hash=%d unmarshal err=%s", string(key), kh, err)
 		return item, cost, expire, false, err
 	}
 	checksum := xxh3.Hash(item.Data[c.entrySize : c.entrySize+entry.keySize+entry.valueSize])
 	if checksum != entry.checksum {
+		log.Printf("block_cache lookup key=%s hash=%d checksum not match %d %d", string(key), kh, checksum, entry.checksum)
 		return item, cost, expire, false, errors.New("checksum mismatch")
 	}
 
 	if entry.expire > 0 && entry.expire <= c.Clock.NowNano() {
+		log.Printf("block_cache lookup key=%s hash=%d expire", string(key), kh)
 		return item, cost, expire, false, err
 	}
 
 	if !bytes.Equal(key, item.Data[c.entrySize:c.entrySize+entry.keySize]) {
+		log.Printf("block_cache lookup key=%s hash=%d key not qeual disk.key=%s", string(key), kh, string(item.Data[c.entrySize:c.entrySize+entry.keySize]))
 		return item, cost, expire, false, err
 	}
 	offset = c.entrySize + entry.keySize
