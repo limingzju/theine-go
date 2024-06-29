@@ -3,6 +3,7 @@ package nvm
 import (
 	"bytes"
 	"errors"
+	"log"
 	"sync"
 	"time"
 	"unsafe"
@@ -154,6 +155,7 @@ func (c *BlockCache) Insert(key []byte, value []byte, cost int64, expire int64) 
 		size += (alignSize - res)
 	}
 	rid, offset, buffer, cb, err := c.regionManager.Allocate(size)
+	log.Printf("block_cache insert key=%s hash=%d rid=%d off=%d size=%d err=%v", string(key), kh, rid, offset, size, err)
 	if err != nil {
 		return err
 	}
