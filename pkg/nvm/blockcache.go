@@ -37,7 +37,9 @@ func align(n int) int {
 }
 
 type BlockInfo struct {
-	address  uint32
+	//address  uint32
+	rid      uint32
+	off      uint32
 	sizeHint uint32
 	removed  bool
 }
@@ -110,9 +112,9 @@ func (c *BlockCache) Lookup(key []byte) (item *alloc.AllocItem, cost int64, expi
 	}
 	c.mu.RUnlock()
 
-	rid, offset := c.realAddress(index.address)
+	rid, offset := index.rid, index.off
 	item, err = c.regionManager.GetData(
-		index, rid, offset, uint64(index.sizeHint)*alignSize,
+		index, uint64(rid), uint64(offset), uint64(index.sizeHint)*alignSize,
 	)
 	log.Printf("block_cache lookup key=%s hash=%d rid=%d offset=%d sizeHint=%d err=%v", string(key), kh, rid, offset, index.sizeHint, err)
 	if err != nil {
@@ -146,10 +148,9 @@ func (c *BlockCache) Lookup(key []byte) (item *alloc.AllocItem, cost int64, expi
 		log.Printf("block_cache lookup key=%s hash=%d key not qeual disk.key=%s", string(key), kh, string(item.Data[c.entrySize:c.entrySize+entry.keySize]))
 		return item, cost, expire, false, err
 	}
-	offset = c.entrySize + entry.keySize
-	item.Data = item.Data[offset : offset+entry.valueSize]
+	offset = uint32(c.entrySize) + uint32(entry.keySize)
+	item.Data = item.Data[offset : offset+uint32(entry.valueSize)]
 	return item, entry.cost, entry.expire, true, err
-
 }
 
 func (c *BlockCache) Insert(key []byte, value []byte, cost int64, expire int64) error {
@@ -196,7 +197,9 @@ func (c *BlockCache) Insert(key []byte, value []byte, cost int64, expire int64) 
 	c.mu.Lock()
 	c.index[kh] = &BlockInfo{
 		sizeHint: uint32(size / alignSize),
-		address:  uint32((uint64(rid)*uint64(c.RegionSize) + offset) / alignSize),
+		//address:  uint32((uint64(rid)*uint64(c.RegionSize) + offset) / alignSize),
+		rid: rid,
+		off: uint32(offset),
 	}
 	c.mu.Unlock()
 	return nil
