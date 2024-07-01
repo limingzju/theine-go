@@ -2,7 +2,6 @@ package nvm
 
 import (
 	"errors"
-	"log"
 	"os"
 	"unsafe"
 
@@ -158,7 +157,7 @@ func (n *NvmStore[K, V]) Get(key K) (value V, cost int64, expire int64, ok bool,
 func (n *NvmStore[K, V]) get(key []byte) (item *alloc.AllocItem, cost int64, expire int64, ok bool, err error) {
 	if n.bighash != nil {
 		item, cost, expire, ok, err = n.bighash.Lookup(key)
-		log.Printf("nvmstore bighash get %s ok=%v err=%v", string(key), ok, err)
+		//log.Printf("nvmstore bighash get %s ok=%v err=%v", string(key), ok, err)
 		if err != nil || ok {
 			return
 		}

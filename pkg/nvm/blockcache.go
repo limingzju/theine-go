@@ -3,7 +3,6 @@ package nvm
 import (
 	"bytes"
 	"errors"
-	"log"
 	"sync"
 	"time"
 	"unsafe"
@@ -102,11 +101,11 @@ func (c *BlockCache) realAddress(address uint32) (uint64, uint64) {
 
 func (c *BlockCache) Lookup(key []byte) (item *alloc.AllocItem, cost int64, expire int64, ok bool, err error) {
 	kh := xxh3.Hash(key)
-	log.Printf("block_cache lookup key=%s hash=%d", string(key), kh)
+	//log.Printf("block_cache lookup key=%s hash=%d", string(key), kh)
 	c.mu.RLock()
 	index, ok := c.index[kh]
 	if !ok {
-		log.Printf("block_cache lookup key=%s hash=%d index !ok", string(key), kh)
+		//log.Printf("block_cache lookup key=%s hash=%d index !ok", string(key), kh)
 		c.mu.RUnlock()
 		return nil, cost, expire, false, nil
 	}
@@ -116,36 +115,36 @@ func (c *BlockCache) Lookup(key []byte) (item *alloc.AllocItem, cost int64, expi
 	item, err = c.regionManager.GetData(
 		index, uint64(rid), uint64(offset), uint64(index.sizeHint)*alignSize,
 	)
-	log.Printf("block_cache lookup key=%s hash=%d rid=%d offset=%d sizeHint=%d err=%v", string(key), kh, rid, offset, index.sizeHint, err)
+	//log.Printf("block_cache lookup key=%s hash=%d rid=%d offset=%d sizeHint=%d err=%v", string(key), kh, rid, offset, index.sizeHint, err)
 	if err != nil {
-		log.Printf("block_cache lookup key=%s hash=%d err=%v", string(key), kh, err)
+		//log.Printf("block_cache lookup key=%s hash=%d err=%v", string(key), kh, err)
 		return item, cost, expire, false, err
 	}
 	if item == nil {
-		log.Printf("block_cache lookup key=%s hash=%d item nil", string(key), kh)
+		//log.Printf("block_cache lookup key=%s hash=%d item nil", string(key), kh)
 		return item, cost, expire, false, nil
 	}
 	var entry BlockEntry
 	err = c.entrySerializer.Unmarshal(item.Data[:c.entrySize], &entry)
 	if err != nil {
-		log.Printf("block_cache lookup key=%s hash=%d unmarshal err=%s", string(key), kh, err)
+		//log.Printf("block_cache lookup key=%s hash=%d unmarshal err=%s", string(key), kh, err)
 		return item, cost, expire, false, err
 	}
-	log.Printf("block_cache lookup key=%s hash=%d entry=%+v", string(key), kh, entry)
+	//log.Printf("block_cache lookup key=%s hash=%d entry=%+v", string(key), kh, entry)
 
 	checksum := xxh3.Hash(item.Data[c.entrySize : c.entrySize+entry.keySize+entry.valueSize])
 	if checksum != entry.checksum {
-		log.Printf("block_cache lookup key=%s hash=%d checksum not match %d %d", string(key), kh, checksum, entry.checksum)
+		//log.Printf("block_cache lookup key=%s hash=%d checksum not match %d %d", string(key), kh, checksum, entry.checksum)
 		return item, cost, expire, false, errors.New("checksum mismatch")
 	}
 
 	if entry.expire > 0 && entry.expire <= c.Clock.NowNano() {
-		log.Printf("block_cache lookup key=%s hash=%d expire", string(key), kh)
+		//log.Printf("block_cache lookup key=%s hash=%d expire", string(key), kh)
 		return item, cost, expire, false, err
 	}
 
 	if !bytes.Equal(key, item.Data[c.entrySize:c.entrySize+entry.keySize]) {
-		log.Printf("block_cache lookup key=%s hash=%d key not qeual disk.key=%s", string(key), kh, string(item.Data[c.entrySize:c.entrySize+entry.keySize]))
+		//log.Printf("block_cache lookup key=%s hash=%d key not qeual disk.key=%s", string(key), kh, string(item.Data[c.entrySize:c.entrySize+entry.keySize]))
 		return item, cost, expire, false, err
 	}
 	offset = uint32(c.entrySize) + uint32(entry.keySize)
@@ -167,7 +166,7 @@ func (c *BlockCache) Insert(key []byte, value []byte, cost int64, expire int64) 
 		size += (alignSize - res)
 	}
 	rid, offset, buffer, cb, err := c.regionManager.Allocate(size)
-	log.Printf("theine block_cache insert key=%s hash=%d rid=%d off=%d size=%d err=%v", string(key), kh, rid, offset, size, err)
+	//log.Printf("theine block_cache insert key=%s hash=%d rid=%d off=%d size=%d err=%v", string(key), kh, rid, offset, size, err)
 	if err != nil {
 		return err
 	}
@@ -191,7 +190,7 @@ func (c *BlockCache) Insert(key []byte, value []byte, cost int64, expire int64) 
 	if err != nil {
 		return err
 	}
-	log.Printf("theine block_cache insert key=%s entrySize=%d checksum=%d", string(key), c.entrySize, header.checksum)
+	//log.Printf("theine block_cache insert key=%s entrySize=%d checksum=%d", string(key), c.entrySize, header.checksum)
 	_ = copy(b[:], hb)
 	cb()
 	c.mu.Lock()
